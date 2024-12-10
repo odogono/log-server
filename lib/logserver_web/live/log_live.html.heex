@@ -1,0 +1,107 @@
+<div class="container mx-auto p-4">
+  <h1 class="text-2xl font-bold mb-4">Message Log</h1>
+  <div class="bg-gray-100 p-4 rounded-lg">
+    <%= for {timestamp, message} <- @messages do %>
+      <div class="mb-2 p-2 bg-white rounded shadow group relative">
+        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+          <button
+            phx-click="copy_message"
+            phx-value-type={get_message_type(message)}
+            phx-value-content={get_message_content(message)}
+            class="text-gray-400 hover:text-blue-500 focus:outline-none"
+            title="Copy message"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+              <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+            </svg>
+          </button>
+          <button
+            phx-click="delete_message"
+            phx-value-timestamp={NaiveDateTime.to_iso8601(timestamp)}
+            class="text-gray-400 hover:text-red-500 focus:outline-none"
+            title="Delete message"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="text-xs text-gray-500 mb-1">
+          <%= Calendar.strftime(timestamp, "%Y-%m-%d %H:%M:%SS.%f") |> String.slice(0..-4//1) %>
+        </div>
+        <%= case message do %>
+          <% {:json, json_string} -> %>
+            <pre class="whitespace-pre overflow-x-auto bg-gray-50 p-2 rounded"><code class="text-sm"><%= json_string %></code></pre>
+          <% {:text, text} -> %>
+            <div class="text-gray-700"><%= text %></div>
+          <% {:status, status} -> %>
+            <div class="text-orange-700"><%= status %></div>
+          <% {:image, data, metadata} -> %>
+            <div class="space-y-2">
+              <img
+                src={data}
+                class="max-w-full h-auto rounded-lg shadow-sm"
+                style="max-height: 400px;"
+              />
+              <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>Dimensions: <%= metadata["width"] %>x<%= metadata["height"] %>px</div>
+                  <div>Type: <%= metadata["type"] %></div>
+                  <%= if metadata["filename"] do %>
+                    <div>Filename: <%= metadata["filename"] %></div>
+                  <% end %>
+                  <%= if metadata["size"] do %>
+                    <div>Size: <%= format_size(metadata["size"]) %></div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% {:svg_path, path, metadata} -> %>
+            <div class="space-y-2">
+              <svg
+                class="w-full h-auto bg-white rounded-lg shadow-sm"
+                viewBox={metadata["viewBox"] || "0 0 100 100"}
+                width={metadata["width"] || "300"}
+                height={metadata["height"] || "300"}
+                style="max-height: 400px;"
+              >
+                <path
+                  d={path}
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                <div class="grid grid-cols-2 gap-2">
+                  <%= if metadata["width"] && metadata["height"] do %>
+                    <div>Size: <%= metadata["width"] %> x <%= metadata["height"] %></div>
+                  <% end %>
+                  <%= if metadata["viewBox"] do %>
+                    <div>ViewBox: <%= metadata["viewBox"] %></div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
