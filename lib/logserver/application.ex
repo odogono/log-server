@@ -9,7 +9,7 @@ defmodule Logserver.Application do
   def start(_type, _args) do
     children = [
       LogserverWeb.Telemetry,
-      # Logserver.Repo,
+      Logserver.Repo,
       {DNSCluster, query: Application.get_env(:logserver, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Logserver.PubSub},
       # Start the Finch HTTP client for sending emails
