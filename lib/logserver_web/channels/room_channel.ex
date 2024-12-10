@@ -28,6 +28,18 @@ defmodule LogserverWeb.RoomChannel do
     {:reply, :ok, socket}
   end
 
+  def handle_in(
+        "new_message",
+        %{"body" => %{"type" => "svg_path", "path" => path} = svg_data},
+        socket
+      ) do
+    Logger.debug("Received SVG path message")
+    metadata = Map.take(svg_data, ["width", "height", "viewBox"])
+    broadcast_log({:svg_path, path, metadata})
+    broadcast!(socket, "new_message", %{body: svg_data})
+    {:reply, :ok, socket}
+  end
+
   def handle_in("new_message", %{"body" => body} = payload, socket) when is_map(body) do
     Logger.debug("Received JSON message: #{inspect(body)}")
     formatted_json = Jason.encode!(body, pretty: true)
@@ -55,10 +67,20 @@ defmodule LogserverWeb.RoomChannel do
     # Save to database
     {type, content} =
       case message do
-        {:json, json} -> {"json", json}
-        {:text, text} -> {"text", text}
-        {:status, status} -> {"status", status}
-        {:image, data, metadata} -> {"image", Jason.encode!(%{data: data, metadata: metadata})}
+        {:json, json} ->
+          {"json", json}
+
+        {:text, text} ->
+          {"text", text}
+
+        {:status, status} ->
+          {"status", status}
+
+        {:image, data, metadata} ->
+          {"image", Jason.encode!(%{data: data, metadata: metadata})}
+
+        {:svg_path, path, metadata} ->
+          {"svg_path", Jason.encode!(%{path: path, metadata: metadata})}
       end
 
     %Message{}

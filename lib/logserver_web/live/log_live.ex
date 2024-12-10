@@ -35,6 +35,11 @@ defmodule LogserverWeb.LogLive do
     {:image, parsed["data"], parsed["metadata"]}
   end
 
+  defp message_tuple("svg_path", content) do
+    parsed = Jason.decode!(content)
+    {:svg_path, parsed["path"], parsed["metadata"]}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -69,6 +74,35 @@ defmodule LogserverWeb.LogLive do
                       <% end %>
                       <%= if metadata["size"] do %>
                         <div>Size: <%= format_size(metadata["size"]) %></div>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+              <% {:svg_path, path, metadata} -> %>
+                <div class="space-y-2">
+                  <svg
+                    class="w-full h-auto bg-white rounded-lg shadow-sm"
+                    viewBox={metadata["viewBox"] || "0 0 100 100"}
+                    width={metadata["width"] || "300"}
+                    height={metadata["height"] || "300"}
+                    style="max-height: 400px;"
+                  >
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                    <div class="grid grid-cols-2 gap-2">
+                      <%= if metadata["width"] && metadata["height"] do %>
+                        <div>Size: <%= metadata["width"] %> x <%= metadata["height"] %></div>
+                      <% end %>
+                      <%= if metadata["viewBox"] do %>
+                        <div>ViewBox: <%= metadata["viewBox"] %></div>
                       <% end %>
                     </div>
                   </div>
