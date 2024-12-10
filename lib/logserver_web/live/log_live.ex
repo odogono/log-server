@@ -5,19 +5,24 @@ defmodule LogserverWeb.LogLive do
   alias Logserver.Logging.Message
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(%{"room_id" => room_id} = _params, _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(Logserver.PubSub, "log:messages")
+      Phoenix.PubSub.subscribe(Logserver.PubSub, "log:messages:#{room_id}")
     end
 
     messages =
-      Message.ordered_messages()
+      Message.ordered_messages(room_id)
       |> Repo.all()
       |> Enum.map(fn msg ->
         {msg.timestamp, message_tuple(msg.type, msg.content)}
       end)
 
-    {:ok, assign(socket, messages: messages)}
+    {:ok, assign(socket, messages: messages, room_id: room_id)}
+  end
+
+  def mount(_params, _session, socket) do
+    # Default to "lobby" if no room_id is provided
+    mount(%{"room_id" => "lobby"}, _session, socket)
   end
 
   @impl true
@@ -30,7 +35,7 @@ defmodule LogserverWeb.LogLive do
   def handle_event("delete_message", %{"timestamp" => timestamp}, socket) do
     timestamp = NaiveDateTime.from_iso8601!(timestamp)
 
-    Message.delete_message(timestamp)
+    Message.delete_message(timestamp, socket.assigns.room_id)
     |> Repo.delete_all()
 
     messages =

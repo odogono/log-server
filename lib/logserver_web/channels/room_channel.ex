@@ -4,18 +4,12 @@ defmodule LogserverWeb.RoomChannel do
   alias Logserver.Repo
   alias Logserver.Logging.Message
 
-  def join("room:lobby", _params, socket) do
-    Logger.info("User joined room:lobby")
-    broadcast_log({:status, "User joined room:lobby"})
-    {:ok, socket}
+  def join("room:" <> room_id, _params, socket) do
+    Logger.info("User joined room:#{room_id}")
+    broadcast_log({:status, "User joined room:#{room_id}"}, room_id)
+    {:ok, assign(socket, :room_id, room_id)}
   end
 
-  def join("room:" <> _private_room_id, _params, _socket) do
-    Logger.info("User attempting to join room:#{_private_room_id}")
-    {:error, %{reason: "unauthorized"}}
-  end
-
-  # Handle incoming messages
   def handle_in(
         "new_message",
         %{"body" => %{"type" => "image", "data" => data} = image_data},
@@ -23,8 +17,8 @@ defmodule LogserverWeb.RoomChannel do
       ) do
     Logger.debug("Received image message")
     metadata = Map.take(image_data, ["width", "height", "size", "type", "filename"])
-    broadcast_log({:image, data, metadata})
-    broadcast!(socket, "new_message", %{body: image_data})
+    broadcast_log({:image, data, metadata}, socket.assigns.room_id)
+    # broadcast!(socket, "new_message", %{body: image_data})
     {:reply, :ok, socket}
   end
 
@@ -35,36 +29,35 @@ defmodule LogserverWeb.RoomChannel do
       ) do
     Logger.debug("Received SVG path message")
     metadata = Map.take(svg_data, ["width", "height", "viewBox"])
-    broadcast_log({:svg_path, path, metadata})
-    broadcast!(socket, "new_message", %{body: svg_data})
+    broadcast_log({:svg_path, path, metadata}, socket.assigns.room_id)
+    # broadcast!(socket, "new_message", %{body: svg_data})
     {:reply, :ok, socket}
   end
 
   def handle_in("new_message", %{"body" => body} = payload, socket) when is_map(body) do
     Logger.debug("Received JSON message: #{inspect(body)}")
     formatted_json = Jason.encode!(body, pretty: true)
-    broadcast_log({:json, formatted_json})
-    broadcast!(socket, "new_message", payload)
+    broadcast_log({:json, formatted_json}, socket.assigns.room_id)
+    # broadcast!(socket, "new_message", payload)
     {:reply, :ok, socket}
   end
 
   def handle_in("new_message", %{"body" => body}, socket) do
     Logger.debug("Received message: #{body}")
-    broadcast_log({:text, body})
-    broadcast!(socket, "new_message", %{body: body})
+    broadcast_log({:text, body}, socket.assigns.room_id)
+    # broadcast!(socket, "new_message", %{body: body})
     {:reply, :ok, socket}
   end
 
   def handle_in(_message, _params, socket) do
     Logger.debug("Received unknown message: #{_message}")
-    broadcast_log({:text, "Received unknown message: #{_message}"})
+    broadcast_log({:text, "Received unknown message: #{_message}"}, socket.assigns.room_id)
     {:noreply, socket}
   end
 
-  defp broadcast_log(message) do
+  defp broadcast_log(message, room_id) do
     timestamp = NaiveDateTime.local_now()
 
-    # Save to database
     {type, content} =
       case message do
         {:json, json} ->
@@ -87,13 +80,14 @@ defmodule LogserverWeb.RoomChannel do
     |> Message.changeset(%{
       type: type,
       content: content,
-      timestamp: timestamp
+      timestamp: timestamp,
+      room_id: room_id
     })
     |> Repo.insert()
 
     Phoenix.PubSub.broadcast(
       Logserver.PubSub,
-      "log:messages",
+      "log:messages:#{room_id}",
       {:new_message, {timestamp, message}}
     )
   end

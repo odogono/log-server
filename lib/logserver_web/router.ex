@@ -19,6 +19,7 @@ defmodule LogserverWeb.Router do
 
     get "/", PageController, :home
     live "/logs", LogLive
+    live "/logs/:room_id", LogLive
   end
 
   # Other scopes may use custom stacks.

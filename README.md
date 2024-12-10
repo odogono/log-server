@@ -6,6 +6,14 @@ Displays SVG paths, images, and JSON messages.
 
 
 
+Access different logs via URLs like /logs/room1, /logs/room2, etc.
+Messages are stored and displayed per room
+The default room is "lobby" at /logs
+Each room has its own message history
+Messages are only broadcast to users in the same room
+The room name will be shown in the UI, and messages will be isolated to their specific rooms.
+
+
 To start your Phoenix server:
 
   * Run `mix setup` to install and setup dependencies
