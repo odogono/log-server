@@ -23,4 +23,10 @@ defmodule Logserver.Logging.Message do
       limit: ^limit
     )
   end
+
+  def delete_message(timestamp) do
+    from(m in __MODULE__,
+      where: m.timestamp == ^timestamp
+    )
+  end
 end

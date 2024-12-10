@@ -26,6 +26,21 @@ defmodule LogserverWeb.LogLive do
     {:noreply, assign(socket, messages: messages)}
   end
 
+  @impl true
+  def handle_event("delete_message", %{"timestamp" => timestamp}, socket) do
+    timestamp = NaiveDateTime.from_iso8601!(timestamp)
+
+    Message.delete_message(timestamp)
+    |> Repo.delete_all()
+
+    messages =
+      Enum.reject(socket.assigns.messages, fn {msg_timestamp, _} ->
+        NaiveDateTime.compare(msg_timestamp, timestamp) == :eq
+      end)
+
+    {:noreply, assign(socket, messages: messages)}
+  end
+
   defp message_tuple("json", content), do: {:json, content}
   defp message_tuple("text", content), do: {:text, content}
   defp message_tuple("status", content), do: {:status, content}
@@ -47,7 +62,28 @@ defmodule LogserverWeb.LogLive do
       <h1 class="text-2xl font-bold mb-4">Message Log</h1>
       <div class="bg-gray-100 p-4 rounded-lg">
         <%= for {timestamp, message} <- @messages do %>
-          <div class="mb-2 p-2 bg-white rounded shadow">
+          <div class="mb-2 p-2 bg-white rounded shadow group relative">
+            <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                phx-click="delete_message"
+                phx-value-timestamp={NaiveDateTime.to_iso8601(timestamp)}
+                class="text-gray-400 hover:text-red-500 focus:outline-none"
+                title="Delete message"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
             <div class="text-xs text-gray-500 mb-1">
               <%= Calendar.strftime(timestamp, "%Y-%m-%d %H:%M:%SS.%f") |> String.slice(0..-4//1) %>
             </div>
