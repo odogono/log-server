@@ -41,6 +41,49 @@ defmodule LogserverWeb.LogLive do
     {:noreply, assign(socket, messages: messages)}
   end
 
+  @impl true
+  def handle_event("copy_message", %{"type" => type, "content" => content}, socket) do
+    text =
+      case type do
+        "svg_path" ->
+          path = Jason.decode!(content)["path"]
+          metadata = Jason.decode!(content)["metadata"]
+
+          """
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="#{metadata["width"] || 300}"
+            height="#{metadata["height"] || 300}"
+            viewBox="#{metadata["viewBox"] || "0 0 100 100"}"
+          >
+            <path
+              d="#{path}"
+              fill="none"
+              stroke="black"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          """
+
+        "json" ->
+          content
+
+        "text" ->
+          content
+
+        "status" ->
+          content
+
+        "image" ->
+          data = Jason.decode!(content)["data"]
+          data
+      end
+
+    {:noreply, push_event(socket, "copy_to_clipboard", %{text: text})}
+  end
+
   defp message_tuple("json", content), do: {:json, content}
   defp message_tuple("text", content), do: {:text, content}
   defp message_tuple("status", content), do: {:status, content}
@@ -55,6 +98,26 @@ defmodule LogserverWeb.LogLive do
     {:svg_path, parsed["path"], parsed["metadata"]}
   end
 
+  defp get_message_type(message) do
+    case message do
+      {:json, _} -> "json"
+      {:text, _} -> "text"
+      {:status, _} -> "status"
+      {:image, _, _} -> "image"
+      {:svg_path, _, _} -> "svg_path"
+    end
+  end
+
+  defp get_message_content(message) do
+    case message do
+      {:json, content} -> content
+      {:text, content} -> content
+      {:status, content} -> content
+      {:image, data, metadata} -> Jason.encode!(%{data: data, metadata: metadata})
+      {:svg_path, path, metadata} -> Jason.encode!(%{path: path, metadata: metadata})
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -63,7 +126,24 @@ defmodule LogserverWeb.LogLive do
       <div class="bg-gray-100 p-4 rounded-lg">
         <%= for {timestamp, message} <- @messages do %>
           <div class="mb-2 p-2 bg-white rounded shadow group relative">
-            <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+              <button
+                phx-click="copy_message"
+                phx-value-type={get_message_type(message)}
+                phx-value-content={get_message_content(message)}
+                class="text-gray-400 hover:text-blue-500 focus:outline-none"
+                title="Copy message"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                  <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                </svg>
+              </button>
               <button
                 phx-click="delete_message"
                 phx-value-timestamp={NaiveDateTime.to_iso8601(timestamp)}
@@ -148,6 +228,52 @@ defmodule LogserverWeb.LogLive do
         <% end %>
       </div>
     </div>
+
+    <script>
+      window.addEventListener("phx:copy_to_clipboard", (e) => {
+        const text = e.detail.text;
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+
+        // Position off-screen but still selectable
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '0';
+        textarea.setAttribute('readonly', ''); // Prevent mobile keyboard from showing
+
+        document.body.appendChild(textarea);
+
+        // For iOS
+        const range = document.createRange();
+        range.selectNodeContents(textarea);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        textarea.focus();
+        textarea.setSelectionRange(0, textarea.value.length);
+
+        let success = false;
+        try {
+          console.log('is secure context', document.isSecureContext);
+          success = document.execCommand('copy');
+          if( !success ){
+            setTimeout(() => {
+                navigator.clipboard.writeText(text).then(
+                () => console.log('Text copied successfully'),
+                (err) => console.error('Failed to copy text:', err)
+                );
+            }, 0);
+          } else {
+            console.log('Text copied successfully:', success);
+            console.log('Copied text:', text);
+          }
+        } catch (err) {
+          console.error('Failed to copy text:', err);
+        }
+
+        document.body.removeChild(textarea);
+      });
+    </script>
     """
   end
 
